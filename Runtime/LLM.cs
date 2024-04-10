@@ -74,7 +74,8 @@ namespace LLMUnity
         public bool serverStarted { get; private set; } = false;
 
         /// \cond HIDE
-        [HideInInspector] public readonly (string, string)[] modelOptions = new(string, string)[]
+        [HideInInspector]
+        public readonly (string, string)[] modelOptions = new (string, string)[]
         {
             ("Download model", null),
             ("Mistral 7B Instruct v0.2 (medium, best overall)", "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf?download=true"),
@@ -226,7 +227,8 @@ namespace LLMUnity
 
         void KillServersAfterUnityCrash()
         {
-            lock (crashKillLock) {
+            lock (crashKillLock)
+            {
                 if (crashKill) return;
                 LLMUnitySetup.KillServerAfterUnityCrash(server);
                 crashKill = true;
@@ -242,11 +244,11 @@ namespace LLMUnity
         /// </summary>
         new public async void Awake()
         {
-            if (killExistingServersOnStart) KillServersAfterUnityCrash();
-            if (asynchronousStartup) await StartLLMServer();
-            else _ = StartLLMServer();
-            base.Awake();
-            serverStarted = true;
+            // if (killExistingServersOnStart) KillServersAfterUnityCrash();
+            // if (asynchronousStartup) await StartLLMServer();
+            // else _ = StartLLMServer();
+            // base.Awake();
+            // serverStarted = true;
         }
 
         private string SelectApeBinary()
@@ -301,7 +303,7 @@ namespace LLMUnity
                     serverBlock.Set();
                 }
             }
-            catch {}
+            catch { }
         }
 
         private void ProcessExited(object sender, EventArgs e)

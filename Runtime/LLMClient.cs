@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
+using Newtonsoft.Json.Linq;
 
 namespace LLMUnity
 {
@@ -32,16 +33,16 @@ namespace LLMUnity
         }
     }
 
-    public class ClientAttribute : PropertyAttribute {}
-    public class ServerAttribute : PropertyAttribute {}
-    public class ModelAttribute : PropertyAttribute {}
-    public class ModelAddonAttribute : PropertyAttribute {}
-    public class ChatAttribute : PropertyAttribute {}
-    public class ClientAdvancedAttribute : PropertyAttribute {}
-    public class ServerAdvancedAttribute : PropertyAttribute {}
-    public class ModelAdvancedAttribute : PropertyAttribute {}
-    public class ModelAddonAdvancedAttribute : PropertyAttribute {}
-    public class ModelExpertAttribute : PropertyAttribute {}
+    public class ClientAttribute : PropertyAttribute { }
+    public class ServerAttribute : PropertyAttribute { }
+    public class ModelAttribute : PropertyAttribute { }
+    public class ModelAddonAttribute : PropertyAttribute { }
+    public class ChatAttribute : PropertyAttribute { }
+    public class ClientAdvancedAttribute : PropertyAttribute { }
+    public class ServerAdvancedAttribute : PropertyAttribute { }
+    public class ModelAdvancedAttribute : PropertyAttribute { }
+    public class ModelAddonAdvancedAttribute : PropertyAttribute { }
+    public class ModelExpertAttribute : PropertyAttribute { }
     /// \endcond
 
     [DefaultExecutionOrder(-1)]
@@ -379,14 +380,14 @@ namespace LLMUnity
         async Task<string> CompletionRequest(string json, Callback<string> callback = null)
         {
             string result = "";
-            if (stream)
-            {
-                result = await PostRequest<MultiChatResult, string>(json, "completion", MultiChatContent, callback);
-            }
-            else
-            {
-                result = await PostRequest<ChatResult, string>(json, "completion", ChatContent, callback);
-            }
+            // if (stream)
+            // {
+            //     result = await PostRequest<MultiChatResult, string>(json, "completion", MultiChatContent, callback);
+            // }
+            // else
+            // {
+            result = await PostRequest(json, "v1/chat/completions", callback);
+            // }
             return result;
         }
 
@@ -448,25 +449,61 @@ namespace LLMUnity
             // handle a chat message by the user
             // call the callback function while the answer is received
             // call the completionCallback function when the answer is fully received
-            await InitNKeep();
+            // await InitNKeep();
 
-            string json;
-            lock (chatPromptLock) {
-                AddPlayerMessage(query);
-                string prompt = template.ComputePrompt(chat, AIName);
-                json = JsonUtility.ToJson(GenerateRequest(prompt));
-                chat.RemoveAt(chat.Count - 1);
-            }
+            // string json;
+            // lock (chatPromptLock) {
+            //     AddPlayerMessage(query);
+            //     string prompt = template.ComputePrompt(chat, AIName);
+            //     json = JsonUtility.ToJson(GenerateRequest(prompt));
+            //     chat.RemoveAt(chat.Count - 1);
+            // }
 
-            string result = await CompletionRequest(json, callback);
+            Debug.Log("Triggering chat");
 
-            if (addToHistory && result != null)
+            JObject jsonObj = JObject.FromObject(new
             {
-                lock (chatAddLock) {
-                    AddPlayerMessage(query);
-                    AddAIMessage(result);
+                model = "meetkai/functionary-7b-v1.4-GGUF",
+                messages = new List<object> {
+                    new
+                    {
+                        role = "user",
+                        content = "What is the weather for Istanbul?"
+                    }
+                },
+                functions = new List<object> {
+                    new
+                    {
+                        name = "get_current_weather",
+                        description = "Get the current weather",
+                        parameters = new
+                        {
+                            type = "object",
+                            properties = new
+                            {
+                                location = new
+                                {
+                                    type = "string",
+                                    description = "The city and state, e.g. San Francisco, CA"
+                                }
+                            },
+                            required = new JArray("location")
+                        }
+                    }
                 }
-            }
+            });
+
+            Debug.Log("here");
+
+            string result = await CompletionRequest(jsonObj.ToString(), callback);
+
+            // if (addToHistory && result != null)
+            // {
+            //     lock (chatAddLock) {
+            //         AddPlayerMessage(query);
+            //         AddAIMessage(result);
+            //     }
+            // }
 
             completionCallback?.Invoke();
             return result;
@@ -544,7 +581,8 @@ namespace LLMUnity
             TokenizeRequest tokenizeRequest = new TokenizeRequest();
             tokenizeRequest.content = query;
             string json = JsonUtility.ToJson(tokenizeRequest);
-            return await PostRequest<TokenizeResult, List<int>>(json, "tokenize", TokenizeContent, callback);
+            // return await PostRequest<TokenizeResult, List<int>>(json, "tokenize", TokenizeContent, callback);
+            return null;
         }
 
         /// <summary>
@@ -559,7 +597,8 @@ namespace LLMUnity
             TokenizeResult tokenizeRequest = new TokenizeResult();
             tokenizeRequest.tokens = tokens;
             string json = JsonUtility.ToJson(tokenizeRequest);
-            return await PostRequest<TokenizeRequest, string>(json, "detokenize", DetokenizeContent, callback);
+            // return await PostRequest<TokenizeRequest, string>(json, "detokenize", DetokenizeContent, callback);
+            return "";
         }
 
         Ret ConvertContent<Res, Ret>(string response, ContentCallback<Res, Ret> getContent = null)
@@ -608,7 +647,7 @@ namespace LLMUnity
             {
                 webRequest.timeout = timeout;
                 webRequest.SendWebRequest();
-                while (!webRequest.isDone) {}
+                while (!webRequest.isDone) { }
                 if (webRequest.result == UnityWebRequest.Result.ConnectionError)
                 {
                     return false;
@@ -640,20 +679,22 @@ namespace LLMUnity
             }
         }
 
-        async Task<Ret> PostRequest<Res, Ret>(string json, string endpoint, ContentCallback<Res, Ret> getContent, Callback<Ret> callback = null)
+        async Task<string> PostRequest(string json, string endpoint, Callback<string> callback = null)
         {
             // send a post request to the server and call the relevant callbacks to convert the received content and handle it
             // this function has streaming functionality i.e. handles the answer while it is being received
-            Ret result = default;
-            string errorMessage = "";
-            if (host == "localhost" && server == null) errorMessage += "No server found!";
-            if (server != null && !server.serverListening) errorMessage += "Server is not listening!";
-            if (server != null && LLMUnitySetup.NumServersForPort(port) > 1) errorMessage += "Multiple servers found for port!";
-            if (errorMessage != "")
-            {
-                Debug.LogError(errorMessage);
-                return result;
-            }
+            string result = "";
+            // string errorMessage = "";
+            // if (host == "localhost" && server == null) errorMessage += "No server found!";
+            // if (server != null && !server.serverListening) errorMessage += "Server is not listening!";
+            // if (server != null && LLMUnitySetup.NumServersForPort(port) > 1) errorMessage += "Multiple servers found for port!";
+            // if (errorMessage != "")
+            // {
+            //     Debug.LogError(errorMessage);
+            //     return result;
+            // }
+
+            Debug.Log("Sending post request");
 
             byte[] jsonToSend = new System.Text.UTF8Encoding().GetBytes(json);
             using (var request = UnityWebRequest.Put($"{host}:{port}/{endpoint}", jsonToSend))
@@ -677,7 +718,7 @@ namespace LLMUnity
                     // Check if progress has changed
                     if (currentProgress != lastProgress && callback != null)
                     {
-                        callback?.Invoke(ConvertContent(request.downloadHandler.text, getContent));
+                        callback?.Invoke(request.downloadHandler.text);
                         lastProgress = currentProgress;
                     }
                     // Wait for the next frame
@@ -685,7 +726,7 @@ namespace LLMUnity
                 }
                 WIPRequests.Remove(request);
                 if (request.result != UnityWebRequest.Result.Success) Debug.LogError(request.error);
-                else result = ConvertContent(request.downloadHandler.text, getContent);
+                else result = request.downloadHandler.text;
                 callback?.Invoke(result);
             }
             return result;
